@@ -1,7 +1,7 @@
 const path = require('path');
+const WebpackBar = require('webpackbar');
 const ESLintPlugin = require('eslint-webpack-plugin');
 const { CleanWebpackPlugin } = require('clean-webpack-plugin');
-const { ProgressPlugin } = require('webpack');
 
 module.exports = {
   mode: process.env.NODE_ENV || 'production',
@@ -22,7 +22,9 @@ module.exports = {
     ],
   },
   plugins: [
-    new ProgressPlugin(),
+    new WebpackBar({
+      color: '#ffafcc',
+    }),
     new CleanWebpackPlugin(),
     new ESLintPlugin({
       extensions: ['ts'],
@@ -36,11 +38,5 @@ module.exports = {
         loader: 'ts-loader',
       },
     ],
-  },
-  cache: {
-    type: 'filesystem',
-    buildDependencies: {
-      config: [__filename],
-    },
   },
 };

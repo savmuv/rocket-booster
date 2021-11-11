@@ -1,25 +1,15 @@
-import { createResponse } from './utils';
-import { UpstreamOptions } from '../types/upstream';
-import { OptimizationOptions } from '../types/optimization';
 import { Middleware } from '../types/middleware';
+import { UpstreamOptions } from '../types/upstream';
 
 export const cloneRequest = (
   url: string,
   request: Request,
-  optimization?: OptimizationOptions,
 ): Request => {
   const requestInit: CfRequestInit = {
     body: request.body,
     method: request.method,
     headers: request.headers,
   };
-
-  if (optimization !== undefined) {
-    requestInit.cf = {
-      mirage: optimization.mirage,
-      minify: optimization.minify,
-    };
-  }
   return new Request(url, requestInit);
 };
 
@@ -31,7 +21,6 @@ export const getURL = (
   const {
     domain,
     port,
-    path,
     protocol,
   } = upstream;
 
@@ -39,9 +28,6 @@ export const getURL = (
 
   if (port !== undefined) {
     cloneURL.port = port.toString();
-  }
-  if (path !== undefined) {
-    cloneURL.pathname = `${path}${cloneURL.pathname}`;
   }
   if (protocol !== undefined) {
     cloneURL.protocol = `${protocol}:`;
@@ -57,7 +43,6 @@ export const sendRequest = async (
   const timeoutId = setTimeout(() => {
     throw new Error('Fetch Timeout');
   }, timeout);
-
   const response = await fetch(request);
   clearTimeout(timeoutId);
   return response;
@@ -67,9 +52,10 @@ export const useUpstream: Middleware = async (
   context,
   next,
 ) => {
-  const { request, upstream, options } = context;
+  const { request, upstream } = context;
   if (upstream === null) {
-    return null;
+    await next();
+    return;
   }
 
   const timeout = upstream.timeout || 10000;
@@ -78,24 +64,15 @@ export const useUpstream: Middleware = async (
     upstream,
   );
 
-  const optimizationOptions = options.optimization;
   const upstreamRequest = cloneRequest(
     url,
     request,
-    optimizationOptions,
   );
 
-  try {
-    context.response = await sendRequest(
-      upstreamRequest,
-      timeout,
-    );
-    return next();
-  } catch (error) {
-    context.response = createResponse(
-      error,
-      500,
-    );
-    return null;
-  }
+  context.response = await sendRequest(
+    upstreamRequest,
+    timeout,
+  );
+
+  await next();
 };

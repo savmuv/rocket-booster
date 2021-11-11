@@ -1,4 +1,5 @@
 import { useCORS } from '../src/cors';
+import { WorkersKV } from '../src/storage';
 import { Context } from '../types/middleware';
 
 const request = new Request(
@@ -25,6 +26,7 @@ const baseContext: Context = {
   response,
   hostname: 'https://httpbin.org',
   upstream: null,
+  storage: new WorkersKV(),
   options: {
     upstream: {
       domain: 'httpbin.org',
@@ -33,7 +35,7 @@ const baseContext: Context = {
 };
 
 describe('cors.ts -> useCORS()', () => {
-  test('undefined options', () => {
+  test('undefined options', async () => {
     const context: Context = {
       ...baseContext,
       options: {
@@ -42,11 +44,11 @@ describe('cors.ts -> useCORS()', () => {
         },
       },
     };
-    useCORS(context, () => null);
+    await useCORS(context, () => null);
     expect(context.response).toBe(response);
   });
 
-  test('Access-Control-Max-Age (Invalid)', () => {
+  test('Access-Control-Max-Age (Invalid)', async () => {
     const context: Context = {
       ...baseContext,
       options: {
@@ -59,11 +61,11 @@ describe('cors.ts -> useCORS()', () => {
         },
       },
     };
-    useCORS(context, () => null);
+    await useCORS(context, () => null);
     expect(context.response.headers.has('Access-Control-Max-Age')).toBeFalsy();
   });
 
-  test('Access-Control-Max-Age (Valid)', () => {
+  test('Access-Control-Max-Age (Valid)', async () => {
     const context: Context = {
       ...baseContext,
       options: {
@@ -76,11 +78,11 @@ describe('cors.ts -> useCORS()', () => {
         },
       },
     };
-    useCORS(context, () => null);
+    await useCORS(context, () => null);
     expect(context.response.headers.get('Access-Control-Max-Age')).toEqual('86400');
   });
 
-  test('Access-Control-Allow-Credentials: false', () => {
+  test('Access-Control-Allow-Credentials: false', async () => {
     const context: Context = {
       ...baseContext,
       options: {
@@ -93,11 +95,11 @@ describe('cors.ts -> useCORS()', () => {
         },
       },
     };
-    useCORS(context, () => null);
+    await useCORS(context, () => null);
     expect(context.response.headers.has('Access-Control-Allow-Credentials')).toBeFalsy();
   });
 
-  test('Access-Control-Allow-Credentials: true', () => {
+  test('Access-Control-Allow-Credentials: true', async () => {
     const context: Context = {
       ...baseContext,
       options: {
@@ -110,11 +112,11 @@ describe('cors.ts -> useCORS()', () => {
         },
       },
     };
-    useCORS(context, () => null);
+    await useCORS(context, () => null);
     expect(context.response.headers.get('Access-Control-Allow-Credentials')).toEqual('true');
   });
 
-  test('Access-Control-Allow-Methods: undefined', () => {
+  test('Access-Control-Allow-Methods: undefined', async () => {
     const context: Context = {
       ...baseContext,
       options: {
@@ -126,11 +128,11 @@ describe('cors.ts -> useCORS()', () => {
         },
       },
     };
-    useCORS(context, () => null);
+    await useCORS(context, () => null);
     expect(context.response.headers.get('Access-Control-Allow-Methods')).toEqual('GET');
   });
 
-  test('Access-Control-Allow-Methods: array', () => {
+  test('Access-Control-Allow-Methods: array', async () => {
     const context: Context = {
       ...baseContext,
       options: {
@@ -143,11 +145,11 @@ describe('cors.ts -> useCORS()', () => {
         },
       },
     };
-    useCORS(context, () => null);
+    await useCORS(context, () => null);
     expect(context.response.headers.get('Access-Control-Allow-Methods')).toEqual('GET,POST,OPTIONS');
   });
 
-  test('Access-Control-Allow-Methods: wildcard', () => {
+  test('Access-Control-Allow-Methods: wildcard', async () => {
     const context: Context = {
       ...baseContext,
       options: {
@@ -160,11 +162,11 @@ describe('cors.ts -> useCORS()', () => {
         },
       },
     };
-    useCORS(context, () => null);
+    await useCORS(context, () => null);
     expect(context.response.headers.get('Access-Control-Allow-Methods')).toEqual('*');
   });
 
-  test('Access-Control-Allow-Origin: true', () => {
+  test('Access-Control-Allow-Origin: true', async () => {
     const context: Context = {
       ...baseContext,
       options: {
@@ -176,11 +178,11 @@ describe('cors.ts -> useCORS()', () => {
         },
       },
     };
-    useCORS(context, () => null);
+    await useCORS(context, () => null);
     expect(context.response.headers.get('Access-Control-Allow-Origin')).toEqual('https://httpbin.org');
   });
 
-  test('Access-Control-Allow-Origin: false', () => {
+  test('Access-Control-Allow-Origin: false', async () => {
     const context: Context = {
       ...baseContext,
       options: {
@@ -192,11 +194,11 @@ describe('cors.ts -> useCORS()', () => {
         },
       },
     };
-    useCORS(context, () => null);
+    await useCORS(context, () => null);
     expect(context.response.headers.has('Access-Control-Allow-Origin')).toBeFalsy();
   });
 
-  test('Access-Control-Allow-Origin: array', () => {
+  test('Access-Control-Allow-Origin: array', async () => {
     const context: Context = {
       ...baseContext,
       options: {
@@ -211,11 +213,11 @@ describe('cors.ts -> useCORS()', () => {
         },
       },
     };
-    useCORS(context, () => null);
+    await useCORS(context, () => null);
     expect(context.response.headers.get('Access-Control-Allow-Origin')).toEqual('https://httpbin.org');
   });
 
-  test('Access-Control-Allow-Origin: wildcard', () => {
+  test('Access-Control-Allow-Origin: wildcard', async () => {
     const context: Context = {
       ...baseContext,
       options: {
@@ -227,7 +229,7 @@ describe('cors.ts -> useCORS()', () => {
         },
       },
     };
-    useCORS(context, () => null);
+    await useCORS(context, () => null);
     expect(context.response.headers.get('Access-Control-Allow-Origin')).toEqual('*');
   });
 });

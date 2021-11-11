@@ -17,105 +17,39 @@ export const setForwardedHeaders = (
   }
 };
 
-export const useRequestHeaders: Middleware = (
+export const useHeaders: Middleware = async (
   context,
   next,
 ) => {
   const { request, options } = context;
-
-  const securityOptions = options.security;
-  const headers = new Headers(request.headers);
-  if (
-    securityOptions !== undefined
-    && securityOptions.forwarded === true
-  ) {
-    setForwardedHeaders(headers);
+  if (options.headers === undefined) {
+    await next();
+    return;
   }
 
-  const headerOptions = options.header;
-  if (
-    headerOptions !== undefined
-    && headerOptions.request !== undefined
-  ) {
-    for (const [key, value] of Object.entries(headerOptions.request)) {
-      headers.set(key, value);
+  const requestHeaders = new Headers(request.headers);
+  setForwardedHeaders(requestHeaders);
+
+  if (options.headers.request !== undefined) {
+    for (const [key, value] of Object.entries(options.headers.request)) {
+      requestHeaders.set(key, value);
     }
   }
 
   context.request = new Request(request.url, {
     body: request.body,
     method: request.method,
-    headers,
+    headers: requestHeaders,
   });
-  return next();
-};
 
-export const useResponseHeaders: Middleware = (
-  context,
-  next,
-) => {
-  const { response, hostname, options } = context;
-  const securityOptions = options.security;
-  if (securityOptions === undefined) {
-    return next();
-  }
+  await next();
 
-  const headers = new Headers(
-    response.headers,
-  );
+  const { response } = context;
+  const responseHeaders = new Headers(response.headers);
 
-  const {
-    xssFilter,
-    noSniff,
-    hidePoweredBy,
-    ieNoOpen,
-    setCookie,
-  } = securityOptions;
-
-  if (xssFilter) {
-    headers.set('X-XSS-Protection', '0');
-  }
-
-  if (noSniff) {
-    headers.set('X-Content-Type-Options', 'nosniff');
-  }
-
-  if (hidePoweredBy) {
-    headers.delete('X-Powered-By');
-  }
-
-  if (ieNoOpen) {
-    headers.set('X-Download-Options', 'noopen');
-  }
-
-  const setCookieHeader = headers.get('set-cookie');
-  if (
-    setCookieHeader !== null
-    && setCookie
-  ) {
-    const setCookieAttributes = setCookieHeader.split(';').map((attribute) => {
-      if (attribute.toLowerCase().trim().startsWith('domain=')) {
-        return `domain=${hostname}`;
-      }
-      return attribute.trim();
-    });
-    headers.set('Set-Cookie', setCookieAttributes.join(';'));
-  }
-
-  const pjaxHeader = headers.get('x-pjax-url');
-  if (pjaxHeader !== null) {
-    const pjaxUrl = new URL(pjaxHeader);
-    pjaxUrl.hostname = hostname;
-    headers.set('x-pjax-url', pjaxUrl.href);
-  }
-
-  const headerOptions = options.header;
-  if (
-    headerOptions !== undefined
-    && headerOptions.response !== undefined
-  ) {
-    for (const [key, value] of Object.entries(headerOptions.response)) {
-      headers.set(key, value);
+  if (options.headers.response !== undefined) {
+    for (const [key, value] of Object.entries(options.headers.response)) {
+      responseHeaders.set(key, value);
     }
   }
 
@@ -124,8 +58,7 @@ export const useResponseHeaders: Middleware = (
     {
       status: response.status,
       statusText: response.statusText,
-      headers,
+      headers: responseHeaders,
     },
   );
-  return next();
 };

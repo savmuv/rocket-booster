@@ -1,4 +1,4 @@
-![Header](https://raw.githubusercontent.com/booster-labs/rocket-booster/master/.github/img/header.png)
+![Header](https://raw.githubusercontent.com/booster-labs/rocket-booster/master/.github/img/header.jpg)
 
 <div align="center">
 
@@ -13,14 +13,14 @@
 
 [📦 Releases](https://github.com/booster-labs/rocket-booster/releases) |
 [📔 Examples](#-examples) |
-[⚙️ Configuration](#-configuration) |
+[⚙️ Options](#-options) |
 [🌎 Contributing](#-contributing)
 </div>
 
-🚀 **rocket-booster** is a serverless reverse proxy and load balancing library built for [Cloudflare Workers](https://workers.cloudflare.com). It sits in front of web servers (e.g. web application, storage platform, or RESTful API), forwards HTTP requests or WebSocket traffics from clients to upstream servers and transforms responses with several optimizations to improve page loading time.
+🚀 **rocket-booster** is a lightweight and scalable reverse proxy and load balancing library built for [Cloudflare Workers](https://workers.cloudflare.com). It sits in front of web servers (e.g. web application, storage platform, or RESTful API), forwards HTTP requests or WebSocket traffics from clients to upstream servers and transforms responses with several optimizations to improve page loading time.
 
 - ⚡ Serverless: Deploy instantly to the auto-scaling serverless platform built by Cloudflare. No virtual machines, servers, or containers to manage.
-- ✈️ Load Balancing: Distribute incoming traffics evenly among different upstream servers.
+- ✈️ Load Balancing: Distribute incoming traffics evenly among different upstream services.
 - ⚙️ Hackable: Deliver unique content based on visitor attributes, conduct A/B testing, or build custom middleware to hook into the lifecycle. (Experimental)
 - 📄 TypeScript: Extensive type declaration with TSDoc.
 
@@ -33,11 +33,10 @@
 ```sh
 npm install -g @cloudflare/wrangler
 
-# JavaScript Template
 wrangler generate booster-app https://github.com/booster-labs/rocket-booster-template
 ```
 
-- Install dependencies and edit the configuration in `src/index.js`
+- Install dependencies and edit the options in `src/index.ts`
 
 ```sh
 cd booster-app
@@ -61,29 +60,29 @@ wrangler publish
 npm install --save rocket-booster
 ```
 
-- Import the `useProxy` function from `rocket-booster` and invoke it with a configuration object. The function returns an object with an `apply()` method, which takes the inbound [Request](https://developers.cloudflare.com/workers/runtime-apis/request) to the Worker, and returns the [Response](https://developers.cloudflare.com/workers/runtime-apis/request) fetched from the upstream server.
+- Import the `useProxy` function from `rocket-booster`. The function returns an object with the `use()` method, which maps route patterns to configuration objects, and `apply()` method, which takes the inbound [Request](https://developers.cloudflare.com/workers/runtime-apis/request) to the Worker, and returns the [Response](https://developers.cloudflare.com/workers/runtime-apis/request) fetched from the upstream service.
 
 ```ts
 import useProxy from 'rocket-booster';
 
-const config = {
-  upstream: {
-    domain:  'example.com',
-    protocol: 'https',
-  },
-};
-
 addEventListener('fetch', (event) => {
-  const proxy = useProxy(config);
+  const proxy = useProxy();
+  proxy.use('/', {
+    upstream: {
+      domain:  'example.com',
+      protocol: 'https',
+    },
+  });
+
   const response = proxy.apply(event.request);
   event.respondWith(response);
 });
 ```
 
-- Edit the configuration object to change the request and response. For example, the configuration below will add the header `Access-Control-Allow-Origin: *` to each response from the upstream server, which allows any origin to access the server.
+- Edit the options object to change the request and response. For example, the options below will add the header `Access-Control-Allow-Origin: *` to each response from the upstream service, which allows any origin to access the service.
 
 ```ts
-const config = {
+proxy.use('/', {
   upstream: {
     domain:  'example.com',
     protocol: 'https',
@@ -91,7 +90,7 @@ const config = {
   cors: {
     origin: '*',
   },
-};
+});
 ```
 
 - Build and publish to Cloudflare Workers
@@ -108,35 +107,35 @@ wrangler publish
 Set up a reverse proxy for [https://developer.mozilla.org](https://developer.mozilla.org):
 
 ```ts
-const config = {
+proxy.use('/', {
   upstream: {
     domain: 'developer.mozilla.org',
     protocol: 'https',
   },
-};
+});
 ```
 
 [Live Demo](https://mozilla.readme.workers.dev/)
 
 ### WebSocket Proxy
 
-`rocket-booster` could proxy WebSocket traffic to upstream servers. No additional configuration is required. Set up a reverse proxy for [wss://echo.websocket.org](wss://echo.websocket.org):
+`rocket-booster` could proxy WebSocket traffic to upstream services. Set up a reverse proxy for [wss://echo.websocket.org](wss://echo.websocket.org):
 
 ```ts
-const config = {
+proxy.use('/', {
   upstream: {
     domain: 'echo.websocket.org',
     protocol: 'https',
   },
-};
+});
 ```
 
 ### S3 Bucket with custom response behavior
 
-`rocket-booster` could set custom headers to request and response, add CORS header, or deliver custom error responses. Set up a reverse proxy for [https://example.s3.amazonaws.com](https://example.s3.amazonaws.com):
+`rocket-booster` could set custom headers to request and response, add CORS header, or add basic authentication. Set up a reverse proxy for [https://example.s3.amazonaws.com](https://example.s3.amazonaws.com):
 
 ```ts
-const config = {
+proxy.use('/', {
   upstream: {
     domain: 'example.s3.amazonaws.com',
     protocol: 'https',
@@ -153,68 +152,150 @@ const config = {
     methods: ['GET', 'POST'],
     credentials: true,
   },
-
-  error: [{
-    errorCode: 404,
-    responsePath: '/404.html',
-  }],
-};
+});
 ```
 
-## ⚙️ Configuration
+## ⚙️ Options
+
+### Routing
+
+The `proxy` object provides a `use` function that maps URL patterns to different options. The options object has an optional `methods` property that accepts a list of HTTP methods, which specifies the request methods the route will handle.
+
+```ts
+// Matches all requests
+proxy.use('/', { /* ... */ });
+
+// Matches GET and POST requests with path starting with `/api`
+proxy.use('/api', {
+  methods: ['GET', 'POST'],
+});
+
+// Matches GET requests with path ending with `.json` in `/data`
+proxy.use('/data/*.json', {
+  methods: ['GET'],
+});
+```
 
 ### Upstream
 
 - `domain`: The domain name of the upstream server.
 - `protocol`: The protocol scheme of the upstream server. (optional, defaults to `'https'`)
 - `port`: The port of the upstream server. (optional, defaults to `80` or `443` based on `protocol`)
-- `path`: The path of the upstream server. (optional, defaults to `'\'`)
 - `timeout`: The maximum wait time on a request to the upstream server. (optional, defaults to `10000`)
+- `weight`: The weight of the server that will be accounted as part of the load balancing decision. (optional, defaults to `1`)
 
 ```ts
-const config = {
+proxy.use('/', {
   upstream: {
     domain: 'httpbin.org',
     protocol: 'https',
     port: 443,
-    path: '/',
     timeout: 10000,
+    weight: 1,
   },
   /* ... */
-};
+});
 ```
 
-To load balance HTTP traffic to a group of servers, pass an array of server configurations to `upstream`. Each request will be forwarded to a randomly selected server. Other load balancing algorithms will be implemented in the future.
+### Load Balancing
+
+To load balance HTTP traffic to a group of servers, pass an array of server configurations to `upstream`. The load balancer will forward the request to an upstream server based on the `loadBalancing.policy` option.
+
+- `random`: The load balancer will select a random upstream server from the server group. The optional `weight` parameter in the server configuration could influence the load balancing algorithm.
+- `ip-hash`: The client's IP address is used as a hashing key to select the upstream server from the server group. It ensures that the requests from the same client will always be directed to the same server.
 
 ```ts
-const config = {
+proxy.use('/', {
+  loadBalancing: {
+    policy: 'random',
+  },
   upstream: [
     {
       domain: 's1.example.com',
       protocol: 'https',
+      weight: 20,
     },
     {
       domain: 's2.example.com',
       protocol: 'https',
+      weight: 30,
     },
     {
       domain: 's3.example.com',
       protocol: 'https',
+      weight: 50,
     },
   ],
   /* ... */
-};
+});
 ```
 
-### Custom Headers
+### Firewall
+
+Each incoming request is inspected against the firewall rules defined in the `firewall` property of the options object. The request will be blocked if it matches at least one firewall rule.
+
+- `field`: The property of the incoming request to be inspected
+  - `asn`: The ASN number of the incoming request. (`number`)
+  - `ip`: The IP address of the incoming request, e.g. `1.1.1.1`. (`string`)
+  - `hostname`: The content of the `host` header, e.g. `github.com`. (`string | undefined`)
+  - `user-agent`: The content of the `user-agent` header, e.g. `Mozilla/5.0`. (`string | undefined`)
+  - `country`: The two-letter country code in the request, e.g. `US`. (`string | undefined`)
+  - `continent`: The continent of the incoming request, e.g. `NA`. (`string | undefined`)
+- `value`: The value of the firewall rule
+- `operator`: The operator to be used to determine if the request is blocked
+  - `equal`: Block the request if `field` is equal to `value`
+  - `not equal`: Block the request if `field` is not equal to `value`
+  - `match`: Block the request if `value` matches `field` (Expect `field` to be `string` and `value` to be `RegExp`)
+  - `not match`: Block the request if `value` doesn't match `field` (Expect `field` to be `string` and `value` to be `RegExp`)
+  - `in`: Block the request if `field` is in `value` (Expect `value` to be `Array`)
+  - `not in`: Block the request if `field` is not in `value` (Expect `value` to be `Array`)
+  - `contain`: Block the request if `field` contains `value` (Expect `field` and `value` to be `string`)
+  - `not contain`: Block the request if `field` doesn't contain `value` (Expect `field` and `value` to be `string`)
+  - `greater`: Block the request if `field` is greater than `value` (Expect `field` and `value` to be `number`)
+  - `less`: Block the request if `field` is less than `value` (Expect `field` and `value` to be `number`)
+
+```ts
+proxy.use('/', {
+  /* ... */
+  firewall: [
+    {
+      field: 'ip',
+      operator: 'in',
+      value: ['1.1.1.1', '1.0.0.1'],
+    },
+    {
+      field: 'user-agent',
+      operator: 'match',
+      value: /Chrome/,
+    }
+  ],
+});
+```
+
+### Rewrite
+
+- `location`: Rewrite the `location` header for responses with 3xx or 201 status if exists. (optional, defaults to `false`)
+
+```ts
+proxy.use('/', {
+  /* ... */
+  rewrite: {
+    path: {
+      '/api/user': '/user'
+    },
+  },
+});
+```
+
+### Headers
 
 - `request`: Sets request header going upstream to the backend. Accepts an object. (optional, defaults to `{}`)
 - `response`: Sets response header coming downstream to the client. Accepts an object. (optional, defaults to `{}`)
 
 ```ts
-const config = {
+proxy.use('/', {
   /* ... */
-  header: {
+  headers: {
     request: {
       'x-example-header': 'hello server',
     },
@@ -222,62 +303,13 @@ const config = {
       'x-example-header': 'hello client',
     },
   },
-};
-```
-
-### Optimization
-
-- `minify`: Remove unnecessary characters (like whitespace, comments, etc.) from HTML, CSS, and JavaScript files. (optional, defaults to `false`)
-- `mirage`: Detect screen size and connection speed to optimally deliver images for the current browser window. (optional, defaults to `false`)
-
-```ts
-const config = {
-  /* ... */
-  optimization: {
-    mirage: true,
-    minify: {
-      javascript: true,
-      css: true,
-      html: true,
-    },
-  },
-};
-```
-
-Several optimizations are enabled by default.
-
-- [Brotli](https://brotli.org/): Speed up page load times for visitor’s HTTPS traffic by applying Brotli compression.
-- [HTTP/2](https://developers.google.com/web/fundamentals/performance/http2): Improve page load time by connection multiplexing, header compression, and server push.
-- [HTTP/3 with QUIC](https://en.wikipedia.org/wiki/HTTP/3): Accelerate HTTP requests by using QUIC, which provides encryption and performance improvements compared to TCP and TLS.
-- [0-RTT Connection Resumption](https://blog.cloudflare.com/introducing-0-rtt/): Improve performance for clients who have previously connected to the website.
-
-### Security
-
-- `forwarded`: Sets the `X-Forwarded-For`, `X-Forwarded-Host`, and `X-Forwarded-Proto` headers. (optional, defaults to `false`)
-- `hidePoweredBy`: Removes the `X-Powered-By` header, which is set by default in some frameworks such as Express. (optional, defaults to `false`)
-- `ieNoOpen`: Sets the `X-Download-Options` header, which is specific to Internet Explorer 8. It forces potentially-unsafe downloads to be saved, mitigating execution of HTML in the website's context. (optional, defaults to `false`)
-- `xssFilter`: Sets the `X-XSS-Protection` header to `0` to disable browsers' buggy cross-site scripting filter. (optional, defaults to `false`)
-- `noSniff`: Sets the `X-Content-Type-Options` header to `nosniff`. This mitigates MIME type sniffing which can cause security vulnerabilities. (optional, defaults to `false`)
-- `setCookie`: Sets the `Domain` attribute of the `Set-Cookie` header to the domain of the worker.
-
-```ts
-const config = {
-  /* ... */
-  security: {
-    fowarded: true,
-    hidePoweredBy: true,
-    ieNoOpen: true,
-    xssFilter: true,
-    noSniff: true,
-    setCookie: true,
-  },
-};
+});
 ```
 
 ### Cross-Origin Resource Sharing (CORS)
 
 - `origin`: Configures the `Access-Control-Allow-Origin` CORS header. (optional, defaults to `false`)
-  - `boolean`: set to `true` to reflect the request origin, or set to `false` to disable CORS.
+  - `boolean`: set to `true` to reflect the origin of the request, or set to `false` to disable CORS.
   - `string[]`: an array of acceptable origins.
   - `*`: allow any origin to access the resource.
 
@@ -292,7 +324,7 @@ const config = {
 - `maxAge`: Configures the `Access-Control-Max-Age` CORS header. Set to an integer to pass the header, otherwise it is omitted. (optional)
 
 ```ts
-const config = {
+proxy.use('/', {
   /* ... */
   cors: {
     origin: true,
@@ -309,45 +341,17 @@ const config = {
     credentials: true,
     maxAge: 86400,
   },
-};
+});
 ```
 
-### Custom Error Response
+### Optimization
 
-- `errorCode`: The HTTP status code to return a custom error response to the client. Excepts a valid HTTP status code or an array of valid status code.
+Cloudflare Workers provides several optimization by default.
 
-- `responsePath`: The path and file name of the custom error page for this HTTP status code. For example: `/error-pages/403-forbidden.html`
-
-- `responseCode`: The HTTP status code to return to the client along with the custom error page. (optional, defaults to the original error code)
-
-```ts
-const config = {
-  /* ... */
-  error: {
-    errorCode: 404,
-    responsePath: '/404.html',
-  },
-};
-```
-
-To customize the response of multiple error codes, pass an array of error response objects to `error`.
-
-```ts
-const config = {
-  /* ... */
-  error: [
-    {
-      errorCode: 404,
-      responsePath: '/404.html',
-    },
-    {
-      errorCode: [500, 501, 502, 503],
-      responsePath: '/500.html',
-      responseCode: 500,
-    },
-  ],
-};
-```
+- [Brotli](https://brotli.org/): Speed up page load times for visitor’s HTTPS traffic by applying Brotli compression.
+- [HTTP/2](https://developers.google.com/web/fundamentals/performance/http2): Improve page load time by connection multiplexing, header compression, and server push.
+- [HTTP/3 with QUIC](https://en.wikipedia.org/wiki/HTTP/3): Accelerate HTTP requests by using QUIC, which provides encryption and performance improvements compared to TCP and TLS.
+- [0-RTT Connection Resumption](https://blog.cloudflare.com/introducing-0-rtt/): Improve performance for clients who have previously connected to the website.
 
 ## 🌎 Contributing
 
